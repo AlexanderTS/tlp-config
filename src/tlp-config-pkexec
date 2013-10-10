@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [ -z $1 ]; then
+    pkexec tlp-config-gui
+else
+    if [ $1 = "-o" ]; then
+        if [ ! -f $2 ]; then
+            touch $2
+        fi
+        
+        if [ -w $2 ]; then
+            tlp-config-gui $@
+        else
+            pkexec tlp-config-gui $@
+        fi
+    else
+        tlp-config-gui $@
+    fi
+fi

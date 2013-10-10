@@ -1,0 +1,12 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=TLP Configurator
+Version=0.9
+Terminal=false
+Type=Application
+StartupNotify=true
+Icon=tlp-config
+Comment=TLP Advanced Power Manager GTK Configurator
+Exec=tlp-config
+Categories=GNOME;GTK;Settings;HardwareSettings;X-GNOME-Settings-Panel;Application;Utility;
+X-GNOME-Settings-Panel=tlp-config
