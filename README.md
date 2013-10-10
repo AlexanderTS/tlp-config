@@ -35,3 +35,5 @@ To install on other distribution, build it manually:
 - $ git clone git://github.com/AlexanderTS/tlp-config.git
 - $ make
 - # make install
+
+Do not forget to install TLP itself! (http://linrunner.de/en/tlp/docs/tlp-linux-advanced-power-management.html)
