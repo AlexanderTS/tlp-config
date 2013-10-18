@@ -1,10 +1,10 @@
-CFLAGS=-g -std=gnu99
+CFLAGS=-std=gnu99
 LDFLAGS=-export-dynamic
 EXECUTABLE=tlp-config-gui
 
 SOURCES=./src/tlp-config.c ./src/io.c ./src/handlers.c
 BUILD_DEPS=./src/tlp-config.h
-RUN_DEPS=./src/main_window.glade tlp.default
+RUN_DEPS=./src/main_window.glade ./src/warning_window.glade tlp.default
 RUN_SCRIPT=./src/tlp-config-pkexec
 PKGCONFIG=gtk+-3.0
 PKGFLAGS=--cflags --libs
@@ -55,6 +55,15 @@ install: $(EXECUTABLE) $(RUN_SCRIPT) $(RUN_DEPS) $(POLICY) $(SHORTCUT) $(ICONS)
 uninstall:
 	rm -f $(EXEC_FOLDER)/tlp-config $(EXEC_FOLDER)$(EXECUTABLE) $(POLICY_FOLDER)$(POLICY) $(ICON_FOLDER)/16x16/apps/tlp-config.png $(ICON_FOLDER)/32x32/apps/tlp-config.png $(ICON_FOLDER)/48x48/apps/tlp-config.png $(ICON_FOLDER)/64x64/apps/tlp-config.png $(ICON_FOLDER)/72x72/apps/tlp-config.png $(ICON_FOLDER)/96x96/apps/tlp-config.png $(ICON_FOLDER)/128x128/apps/tlp-config.png$(SHORTCUT_FOLDER)$(SHORTCUT)
 	rm -rf $(CONFIG_FOLDER)
+	rm -f $(ICON_FOLDER)/16x16/apps/tlp-config.png
+	rm -f $(ICON_FOLDER)/32x32/apps/tlp-config.png
+	rm -f $(ICON_FOLDER)/48x48/apps/tlp-config.png
+	rm -f $(ICON_FOLDER)/64x64/apps/tlp-config.png
+	rm -f $(ICON_FOLDER)/72x72/apps/tlp-config.png
+	rm -f $(ICON_FOLDER)/96x96/apps/tlp-config.png
+	rm -f $(ICON_FOLDER)/128x128/apps/tlp-config.png
+	rm -f $(SHORTCUT_FOLDER)$(SHORTCUT)
+	rm -f $(POLICY_FOLDER)$(POLICY)
 
 clean:
 	rm -f $(EXECUTABLE)
