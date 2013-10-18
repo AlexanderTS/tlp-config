@@ -23,11 +23,20 @@
 #include "tlp-config.h"
 
 TLPSettings tlp_settings;
+GtkWidget *main_window;
+GtkWidget *warning_window;
 
 static FILE *settings_out;
 static char *settings_out_path;
 static GtkBuilder *builder;
-static GtkWidget *main_window;
+
+
+void
+show_warning (char *message)
+{
+     gtk_label_set_text (GTK_LABEL (gtk_builder_get_object (builder, "warning_message")), message);
+     gtk_widget_show (warning_window);
+}
 
 char *
 safe_strstr (char *haystack, char *needle)
@@ -501,6 +510,47 @@ free_tlp_settings_strs (void)
 }
 
 int
+get_var (char *line)
+{
+    int i;
+    char *name;
+    
+    if (strchr (line, '#')) {
+        return -1;
+    } else {
+        for (i = 0; i < VAL_NUM; ++i) {
+            if ( (name = strstr (line, tlp_settings.values[i].name)) ) {
+                if ( name[strlen (tlp_settings.values[i].name)] == '=' ) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+}
+
+/* Commented variables should only be in format #VARIABLE=VALUE */
+int
+get_commented_var (char *line)
+{
+    int i;
+    char *name;
+    
+    if (line[0] == '#') {
+        for (i = 0; i < VAL_NUM; ++i) {
+            if ( (name = strstr (line, tlp_settings.values[i].name)) ) {
+                if (name = line + 1) {
+                    if ( name[strlen (tlp_settings.values[i].name)] == '=' ) {
+                        return i;
+                    }
+                }
+            }
+        }
+    }
+    return -1;
+}
+
+int
 check_and_set_value (char *line)
 {
     int i, l;
@@ -612,17 +662,17 @@ print_tlp_settings (FILE *output)
 }
 
 void
-read_tlp_settings (const char *file_name)
+read_tlp_settings (void)
 {
-    FILE *set_file = fopen(file_name, "r");
-    File file;
-    init_file(set_file, &file);
+    FILE *set_file = fopen("/etc/default/tlp", "r");
+    File settings_in;
+    init_file(set_file, &settings_in);
     char *line;
     
     free_tlp_settings_strs ();
     init_tlp_settings ();
     
-    while ( (line = read_line_wo_comments(&file)) != NULL ) {
+    while ( (line = read_line_wo_comments(&settings_in)) != NULL ) {
         check_and_set_value (line);
         free (line);
     }
@@ -651,14 +701,14 @@ set_ui (void)
     }
     
     togglebutton = GTK_TOGGLE_BUTTON (gtk_builder_get_object (builder, "disable_turbo_ac_checkbutton"));
-    if (get_value_by_name ("CPU_BOOST_ON_AC")->num > 0) {
+    if (get_value_by_name ("CPU_BOOST_ON_AC")->num != 0) {
         gtk_toggle_button_set_active (togglebutton, FALSE);
     } else {
         gtk_toggle_button_set_active (togglebutton, TRUE);
     }
     
     togglebutton = GTK_TOGGLE_BUTTON (gtk_builder_get_object (builder, "disable_turbo_bat_checkbutton"));
-    if (get_value_by_name ("CPU_BOOST_ON_BAT")->num > 0) {
+    if (get_value_by_name ("CPU_BOOST_ON_BAT")->num != 0) {
         gtk_toggle_button_set_active (togglebutton, FALSE);
     } else {
         gtk_toggle_button_set_active (togglebutton, TRUE);
@@ -1111,6 +1161,7 @@ set_ui (void)
     int num = read_cpu_freqs (&cpufreqs);
     
     if (num == 0) {
+        show_warning ("WARNING: file sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies was not found or is corrupt. CPU frequncies could not be set.\nIf you are running Linux 3.10 or higher on Intel processor this warning can be caused by Intel P-State driver. With P-State you probably could not set ondemand/conservative governor either.\nTo disable Intel P-State driver add to the end of \"linux\" line in your grub.cfg:\nintel_pstate=disable");
         fprintf (stderr, "\nWARNING: file sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies was not found or is corrupt. CPU frequncies could not be set.\nIf you are running Linux 3.10 or higher on Intel processor this warning can be caused by Intel P-State driver. With P-State you probably could not set ondemand/conservative governor either.\nTo disable Intel P-State driver add to the end of \"linux\" line in your grub.cfg:\nintel_pstate=disable\n\n");
     } else {
         liststore = gtk_list_store_new (1, G_TYPE_INT);
@@ -1250,18 +1301,21 @@ restart_tlp (void)
     }
     else if (pid < 0) {
         fprintf (stderr, "ERROR: Could not restart TLP. Check if TLP is present.\n");
+        show_warning ("ERROR: Could not restart TLP. Check if TLP is present.");
     }
     else {
         pid_t ws = waitpid( pid, &childExitStatus, WNOHANG);
         if (ws == -1)
         {
             fprintf (stderr, "ERROR: Could not restart TLP. You should have ROOT privileges to restart it.\n");
+            show_warning ("ERROR: Could not restart TLP. You should have ROOT privileges to restart it.");
         }
 
         if(WIFEXITED(childExitStatus))
         {
             status = WEXITSTATUS(childExitStatus);
             fprintf (stderr, "ERROR: Could not restart TLP. You should have ROOT privileges to restart it.\n");
+            show_warning ("ERROR: Could not restart TLP. You should have ROOT privileges to restart it.");
         }
     }
 }
@@ -1284,19 +1338,26 @@ copy(char *source, char *dest)
     }
     else if (pid < 0) {
         fprintf (stderr, "ERROR: Could not start copy process\n");
+        show_warning ("ERROR: Could not start copy process");
     }
     else {
-        pid_t ws = waitpid( pid, &childExitStatus, WNOHANG);
-        if (ws == -1)
-        {
-            fprintf (stderr, "ERROR: Could not start copy process\n");
-        }
+        do {
+            pid_t ws = waitpid( pid, &childExitStatus, WNOHANG);
+            if (ws == -1)
+            {
+                fprintf (stderr, "ERROR: Could not start copy process\n");
+                show_warning ("ERROR: Could not start copy process");
+            }
 
-        if(WIFEXITED(childExitStatus))
-        {
-            status = WEXITSTATUS(childExitStatus);
-            fprintf (stderr, "ERROR: Could not copy default configuration file\n");
-        }
+            if (WIFEXITED(childExitStatus))
+            {
+                status = WEXITSTATUS(childExitStatus);
+                if (status) {
+                    fprintf (stderr, "ERROR: Could not copy configuration file, status %d\n", status);
+                    show_warning ("ERROR: Could not copy configuration file");
+                }
+            }
+        } while (!WIFEXITED(childExitStatus));
     }
 }
 
@@ -1304,9 +1365,7 @@ void
 restore_defaults (void)
 {
     copy ("/etc/tlp-config/tlp.default", "/etc/default/tlp");
-    free_tlp_settings_strs ();
-    init_tlp_settings ();
-    read_tlp_settings ("/etc/default/tlp");
+    read_tlp_settings ();
     set_ui ();
 }
 
@@ -1315,7 +1374,8 @@ save_settings (void)
 {
     settings_out = fopen (settings_out_path, "w");
     if (!settings_out) {
-        printf ("ERROR: Could not open file for writing %s\n", settings_out_path);
+        fprintf (stderr, "ERROR: Could not open file for writing %s\n", settings_out_path);
+        show_warning ("ERROR: Could not open file for writing");
         return;
     }
     int i;
@@ -1339,13 +1399,138 @@ save_settings (void)
     fclose (settings_out);
 }
 
+int
+print_value (FILE *file, int i)
+{
+    if (tlp_settings.values[i].is_num) {
+        if (tlp_settings.values[i].num != -1) {
+            fprintf (file, "%s=%d\n", tlp_settings.values[i].name, tlp_settings.values[i].num);
+            return 1;
+        }
+    } else {
+        if (tlp_settings.values[i].str) {
+            if (tlp_settings.values[i].str && strlen (tlp_settings.values[i].str)) {
+                if (safe_strstr (tlp_settings.values[i].str, " ")) {
+                    fprintf (file, "%s=\"%s\"\n", tlp_settings.values[i].name, tlp_settings.values[i].str);
+                } else {
+                    fprintf (file, "%s=%s\n", tlp_settings.values[i].name, tlp_settings.values[i].str);
+                }
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
 void
-create_window (void)
+save_settings_carefully (void)
+{
+    char *tmp_path = calloc (strlen (settings_out_path) + strlen (".new") + 1, sizeof (char));
+    snprintf (tmp_path, strlen (settings_out_path) + strlen (".new") + 1, "%s.new", settings_out_path);
+    
+    FILE *set_file = fopen("/etc/default/tlp", "r");
+    if (!settings_out) {
+        fprintf (stderr, "ERROR: Could not open file for reading /etc/default/tlp\n");
+        show_warning ("ERROR: Could not open file for reading /etc/default/tlp");
+        return;
+    }
+    
+    File settings_in;
+    init_file(set_file, &settings_in);
+    
+    settings_out = fopen (tmp_path, "w");
+    if (!settings_out) {
+        fprintf (stderr, "ERROR: Could not open file for writing %s\n", settings_out_path);
+        show_warning ("ERROR: Could not open file for writing");
+        return;
+    }
+    
+    int i;
+    char first;
+    char *line = NULL;
+    char flags[VAL_NUM];
+    memset (flags, 0, VAL_NUM);
+    
+    while ( (line = read_line(&settings_in)) ) {
+        if ( (i = get_var (line)) >= 0) {
+            print_value (settings_out, i);
+            flags[i] = 1;
+        } else {
+            fprintf (settings_out, "%s", line);
+        }
+        free (line);
+    }
+    fclose (settings_in.file);
+    fclose (settings_out);
+    
+    set_file = fopen(tmp_path, "r");
+    if (!set_file) {
+        fprintf (stderr, "ERROR: Could not open file for reading %s\n", tmp_path);
+        show_warning ("ERROR: Could not open file for reading");
+        return;
+    }
+    init_file(set_file, &settings_in);
+    
+    char *tmp_path_final = calloc (strlen (tmp_path) + strlen (".final") + 1, sizeof (char));
+    snprintf (tmp_path_final, strlen (tmp_path) + strlen (".final") + 1, "%s.final", tmp_path);
+    settings_out = fopen (tmp_path_final, "w");
+    
+    if (!settings_out) {
+        fprintf (stderr, "ERROR: Could not open file for writing %s\n", tmp_path_final);
+        show_warning ("ERROR: Could not open file for writing");
+        return;
+    }
+    
+    while ( (line = read_line(&settings_in)) ) {
+        fprintf (settings_out, "%s", line);
+        
+        if ( (i = get_commented_var (line)) >= 0) {
+            if (!flags[i]) {
+                print_value (settings_out, i);
+                flags[i] = 1;
+            }
+        }
+        
+        free (line);
+    }
+    
+    for (i = 0; i < VAL_NUM; ++i) {
+        if (!flags[i]) {
+            print_value (settings_out, i);
+        }
+    }
+    
+    fclose (settings_in.file);
+    fclose (settings_out);
+    
+    copy (tmp_path_final, settings_out_path);
+    if (remove (tmp_path)) {
+        fprintf (stderr, "ERROR: Could not remove temporary file %s\n", tmp_path);
+        show_warning ("ERROR: Could not remove temporary file");
+    }
+    
+    if (remove (tmp_path_final)) {
+        fprintf (stderr, "ERROR: Could not remove temporary file %s\n", tmp_path_final);
+        show_warning ("ERROR: Could not remove temporary file");
+    }
+    
+    free (tmp_path);
+    free (tmp_path_final);
+}
+
+void
+create_windows ()
 {
     GError* error = NULL;
 
     builder = gtk_builder_new ();
     if (!gtk_builder_add_from_file (builder, "/etc/tlp-config/main_window.glade", &error))
+    {
+            g_critical ("Could not load file: %s", error->message);
+            g_error_free (error);
+    }
+    
+    if (!gtk_builder_add_from_file (builder, "/etc/tlp-config/warning_window.glade", &error))
     {
             g_critical ("Could not load file: %s", error->message);
             g_error_free (error);
@@ -1357,15 +1542,23 @@ create_window (void)
             g_critical ("Error while getting window widget");
     }
     
+    warning_window = GTK_WIDGET (gtk_builder_get_object (builder, "warning_window"));
+    if (!main_window)
+    {
+            g_critical ("Error while getting window widget");
+    }
+    
     set_ui ();
     
     gtk_builder_connect_signals (builder, main_window);
+    gtk_builder_connect_signals (builder, warning_window);
 }
 
 void
 on_close (void)
 {
     gtk_widget_destroy (main_window);
+    gtk_widget_destroy (warning_window);
     g_object_unref (G_OBJECT (builder));
     free_tlp_settings_strs ();
     free (settings_out_path);
@@ -1383,7 +1576,7 @@ main (int argc, char *argv[])
             error = 0;
             settings_out = fopen (argv[2], "a");
             if (!settings_out) {
-                printf ("ERROR: Could not open file for writing %s\n", argv[2]);
+                fprintf (stderr, "ERROR: Could not open file for writing %s\n", argv[2]);
                 return 2;
             }
             settings_out_path = calloc (strlen (argv[2]) + 1, sizeof (char));
@@ -1409,20 +1602,23 @@ main (int argc, char *argv[])
     
     gtk_init (&argc, &argv);
 
+    
+    read_tlp_settings ();
+    create_windows ();
+    gtk_widget_show (main_window);
+    
     if (!settings_out) {
         settings_out = fopen ("/etc/default/tlp", "a");
         if (!settings_out) {
-            printf ("ERROR: Could not open file for writing: /etc/default/tlp\nBe sure to run with ROOT privileges\n");
+            show_warning ("ERROR: Could not open file for writing: /etc/default/tlp\nBe sure to run with ROOT privileges\n");
+            fprintf (stderr, "ERROR: Could not open file for writing: /etc/default/tlp\nBe sure to run with ROOT privileges\n");
+            on_close ();
             return 3;
         }
         settings_out_path = calloc (strlen ("/etc/default/tlp") + 1, sizeof (char));
         snprintf (settings_out_path, strlen ("/etc/default/tlp") + 1, "/etc/default/tlp");
         fclose (settings_out);
     }
-    read_tlp_settings ("/etc/default/tlp");
-    
-    create_window ();
-    gtk_widget_show (main_window);
     gtk_main ();
     
     on_close ();

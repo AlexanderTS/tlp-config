@@ -32,16 +32,19 @@ typedef struct File
     int size;
     int read;
     int act_size;
-    char *buf;
+    char buf[BUF_SIZE];
 } File;
 
 /* From tlp-config.c */
 extern TLPSettings tlp_settings;
+extern GtkWidget *main_window;
+extern GtkWidget *warning_window;
 
 char *safe_strstr (char *, char *);
 int safe_strcmp (char *, char *);
 TLPValue *get_value_by_name (char *);
 void save_settings (void);
+void save_settings_carefully (void);
 void restore_defaults (void);
 void restart_tlp (void);
 void on_close (void);
@@ -50,4 +53,5 @@ void on_close (void);
 /* From io.c */
 int bufgetc (File *);
 void init_file (FILE *, File *);
+char *read_line (File *);
 char *read_line_wo_comments (File *);

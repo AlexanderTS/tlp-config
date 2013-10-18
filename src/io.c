@@ -31,9 +31,35 @@ void
 init_file (FILE *f, File *file)
 {
     file->file = f;
-    file->buf = calloc (BUF_SIZE, sizeof(char));
+    memset (file->buf, BUF_SIZE, 0);
     file->act_size = file->size = BUF_SIZE;
     file->read = 0;
+}
+
+char *read_line (File *file)
+{
+    char *line = NULL;
+    int c, cnt, lng;
+    lng = cnt = 0;
+    
+    while ( (c = bufgetc(file)) != EOF ) {
+                
+        if (lng <= cnt) {
+            line = realloc (line, lng += BUF_SIZE);
+        }
+        
+        line[cnt] = c;
+        ++cnt;
+        
+        if (c == '\n') {
+            break;
+        }
+    }
+    if (line) {
+        line = realloc (line, cnt + 1);
+        line[cnt] = 0;
+    }
+    return line;
 }
 
 char *read_line_wo_comments (File *file)

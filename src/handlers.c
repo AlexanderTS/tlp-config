@@ -42,8 +42,6 @@ toggle_device (gboolean toggle, char *value_name, char *device)
     snprintf (s_device, l2 + 1, " %s", device);
     snprintf (device_s, l2 + 1, "%s ", device);
     
-    if (value->str)
-    
     if (toggle == TRUE)
     {
         if (value->str) {
@@ -290,7 +288,7 @@ on_main_window_destroy (GObject *window)
 void
 save_button_clicked (GObject *calling_widget)
 {
-    save_settings ();
+    save_settings_carefully ();
 }
 
 void
@@ -300,10 +298,17 @@ cancel_button_clicked (GObject *calling_widget)
 }
 
 void
+warning_ok_button_clicked_cb (GObject *calling_widget)
+{
+    gtk_widget_hide (warning_window);
+}
+
+void
 restart_tlp_button_clicked_cb (GObject *calling_widget)
 {
     restart_tlp ();
 }
+
 void
 defaults_button_clicked (GObject *callling_widget)
 {
